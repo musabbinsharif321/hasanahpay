@@ -40,6 +40,7 @@ import {
   handleFirestoreError,
   OperationType,
 } from '@/lib/firebase';
+import { generateUniqueClientCode } from '@/lib/clientCode';
 import {
   calculateExtendedDueDate,
   DEFAULT_PAYMENT_ACCOUNTS,
@@ -576,6 +577,7 @@ Agency Support Contact:
       let targetClientId = selectedExistingClientId;
       let targetClientName =
         clients.find((c) => c.uid === selectedExistingClientId)?.name || '';
+      let createdClientCode = '';
 
       const batch = writeBatch(db);
 
@@ -593,22 +595,33 @@ Agency Support Contact:
         }
 
         const secondaryAuth = getSecondaryAuth();
+        const cleanClientEmail = clientEmail.trim().toLowerCase();
         const cred = await createUserWithEmailAndPassword(
           secondaryAuth,
-          clientEmail.trim(),
+          cleanClientEmail,
           clientPassword
         );
         targetClientId = cred.user.uid;
         targetClientName = clientName.trim();
         await signOut(secondaryAuth);
 
+        const clientCode = await generateUniqueClientCode(db);
+        createdClientCode = clientCode;
+
         batch.set(doc(db, 'users', targetClientId), {
           uid: targetClientId,
+          clientCode,
           name: targetClientName,
-          email: clientEmail.trim(),
+          email: cleanClientEmail,
           phone: clientPhone.trim(),
           companyName: companyName.trim(),
           role: 'client',
+          createdAt: serverTimestamp(),
+        });
+        batch.set(doc(db, 'clientIds', clientCode), {
+          clientCode,
+          email: cleanClientEmail,
+          uid: targetClientId,
           createdAt: serverTimestamp(),
         });
       } else if (!targetClientId) {
@@ -641,6 +654,18 @@ Agency Support Contact:
       });
 
       await batch.commit();
+
+      if (addMode === 'new_client' && createdClientCode) {
+        fetch('/api/sms/welcome', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: clientPhone.trim(),
+            clientCode: createdClientCode,
+            name: targetClientName,
+          }),
+        }).catch(() => {});
+      }
 
       showToast(
         addMode === 'new_client'

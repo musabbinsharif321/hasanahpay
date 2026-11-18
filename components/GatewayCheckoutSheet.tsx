@@ -3,12 +3,10 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
-  Building2,
   Check,
   Copy,
   Loader2,
   Send,
-  Smartphone,
   X,
 } from 'lucide-react';
 import { doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
@@ -22,6 +20,7 @@ import {
   type Subscription,
   type UserProfile,
 } from '@/lib/types';
+import { BankLogo, PaymentMethodLogo } from './PaymentLogos';
 import { useToast } from './ToastProvider';
 
 interface GatewayCheckoutSheetProps {
@@ -302,24 +301,20 @@ function CheckoutSheetContent({
                 <div className="mt-2 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                   {availableMethods.map((method) => {
                     const active = effectiveMethod === method.id;
-                    const Icon = method.id === 'bank' ? Building2 : Smartphone;
                     return (
                       <button
                         key={method.id}
                         type="button"
                         onClick={() => setSelectedMethod(method.id)}
-                        className={`flex min-h-[58px] flex-col items-start justify-center rounded-2xl border p-3 text-left transition active:scale-[0.98] ${
+                        className={`flex min-h-[60px] flex-col items-start justify-center rounded-2xl border p-3 text-left transition active:scale-[0.98] ${
                           active
                             ? `${method.borderClass} ${method.badgeBgClass} ring-2 ${method.ringClass}`
                             : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-[#0B162B] dark:hover:bg-slate-800/70'
                         } ${method.id === 'bank' ? 'col-span-2 sm:col-span-2' : ''}`}
                       >
                         <div className="flex w-full items-center justify-between gap-2">
-                          <span className="inline-flex items-center gap-1.5 text-sm font-bold">
-                            <Icon
-                              className="h-4 w-4 shrink-0"
-                              style={{ color: method.accentHex }}
-                            />
+                          <span className="inline-flex items-center gap-2 text-sm font-bold">
+                            <PaymentMethodLogo method={method.id} className="h-6 w-6 shrink-0" />
                             <span className="text-[#0B2447] dark:text-slate-100">
                               {method.name}
                             </span>
@@ -331,7 +326,7 @@ function CheckoutSheetContent({
                             />
                           )}
                         </div>
-                        <span className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400 w-full">
+                        <span className="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400 w-full">
                           {method.subtitle}
                         </span>
                       </button>
@@ -361,9 +356,9 @@ function CheckoutSheetContent({
 
                 {effectiveMethod === 'bank' ? (
                   <div className="mt-3 space-y-3 text-xs">
-                    {/* Multi-Bank Switcher */}
+                    {/* Multi-Bank Switcher with Individual Bank Logos */}
                     {accounts.banks.length > 1 && (
-                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {accounts.banks.map((bank, idx) => {
                           const isBankSelected = safeBankIndex === idx;
                           return (
@@ -371,22 +366,29 @@ function CheckoutSheetContent({
                               key={bank.id}
                               type="button"
                               onClick={() => setSelectedBankIndex(idx)}
-                              className={`min-h-[44px] rounded-xl border px-3 py-2 text-left transition ${
+                              className={`flex min-h-[50px] items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition ${
                                 isBankSelected
                                   ? 'border-[#1D6E8C] bg-[#0B2447] text-white shadow-xs dark:border-[#38BDF8] dark:bg-[#1D6E8C]'
                                   : 'border-slate-200 bg-white/90 text-slate-700 hover:bg-white dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300'
                               }`}
                             >
-                              <span
-                                className={`block text-[10px] font-bold ${
-                                  isBankSelected ? 'text-[#E5A93B]' : 'text-[#D4941F]'
-                                }`}
-                              >
-                                0{idx + 1}
-                              </span>
-                              <span className="block truncate text-xs font-semibold">
-                                {bank.bankName}
-                              </span>
+                              <BankLogo
+                                bankId={bank.id}
+                                bankName={bank.bankName}
+                                className="h-7 w-7 shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <span
+                                  className={`block text-[10px] font-bold ${
+                                    isBankSelected ? 'text-[#E5A93B]' : 'text-[#D4941F]'
+                                  }`}
+                                >
+                                  0{idx + 1}
+                                </span>
+                                <span className="block truncate text-xs font-semibold">
+                                  {bank.bankName}
+                                </span>
+                              </div>
                             </button>
                           );
                         })}
@@ -395,11 +397,18 @@ function CheckoutSheetContent({
 
                     {/* Selected Bank Details */}
                     <div className="grid grid-cols-2 gap-2.5 rounded-xl bg-white/90 p-3.5 dark:bg-slate-950/75">
-                      <div>
-                        <span className="text-[11px] text-slate-500 dark:text-slate-400">Bank</span>
-                        <p className="font-semibold text-[#0B2447] dark:text-white">
-                          {activeBank.bankName}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <BankLogo
+                          bankId={activeBank.id}
+                          bankName={activeBank.bankName}
+                          className="h-7 w-7 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">Bank</span>
+                          <p className="truncate font-semibold text-[#0B2447] dark:text-white">
+                            {activeBank.bankName}
+                          </p>
+                        </div>
                       </div>
                       <div>
                         <span className="text-[11px] text-slate-500 dark:text-slate-400">

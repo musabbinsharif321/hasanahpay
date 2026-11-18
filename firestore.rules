@@ -43,11 +43,18 @@ service cloud.firestore {
     }
 
     // --- Validation Blueprints ---
+    function isValidClientCode(code) {
+      return code is string && code.matches('^HP-[0-9]{6}$');
+    }
+
     function isValidUser(data, userId) {
       return data.keys().hasAll(['uid', 'name', 'email', 'phone', 'companyName', 'role', 'createdAt']) &&
-        data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'companyName', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'clientCode', 'name', 'email', 'phone', 'companyName', 'avatarUrl', 'role', 'selfRegistered', 'createdAt']) &&
         data.uid == userId &&
         isValidId(data.uid) &&
+        (!('clientCode' in data) || isValidClientCode(data.clientCode)) &&
+        (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() <= 150000)) &&
+        (!('selfRegistered' in data) || data.selfRegistered is bool) &&
         data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
         data.email is string && data.email.size() >= 3 && data.email.size() <= 150 &&
         data.phone is string && data.phone.size() >= 6 && data.phone.size() <= 30 &&
@@ -173,8 +180,12 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isValidId(userId) &&
         isValidUser(incoming(), userId) &&
-        incoming().createdAt == request.time &&
-        isAdmin();
+        incoming().createdAt == request.time && (
+          isAdmin() || (
+            isOwner(userId) &&
+            incoming().role == 'client'
+          )
+        );
       allow update: if isValidId(userId) &&
         isValidUser(incoming(), userId) &&
         incoming().uid == existing().uid &&
@@ -182,10 +193,25 @@ service cloud.firestore {
           isAdmin() || (
             isOwner(userId) &&
             incoming().role == existing().role &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'companyName'])
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'companyName', 'avatarUrl'])
           )
         );
       allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 1b. Client ID Lookup Registry (HP-XXXXXX -> email)
+    match /clientIds/{clientCode} {
+      allow get: if isValidClientCode(clientCode);
+      allow list: if false;
+      allow create: if isValidClientCode(clientCode) &&
+        isSignedIn() &&
+        incoming().keys().hasAll(['clientCode', 'email', 'uid', 'createdAt']) &&
+        incoming().keys().hasOnly(['clientCode', 'email', 'uid', 'createdAt']) &&
+        incoming().clientCode == clientCode &&
+        (isAdmin() || incoming().uid == request.auth.uid) &&
+        incoming().email is string && incoming().email.size() >= 3 && incoming().email.size() <= 150 &&
+        incoming().createdAt == request.time;
+      allow update, delete: if isAdmin();
     }
 
     // 2. Subscriptions

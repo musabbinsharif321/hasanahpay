@@ -50,30 +50,45 @@ export function AuthPortalRouter() {
     if (!authReady || !authUser) return;
 
     const userRef = doc(db, 'users', authUser.uid);
+    let missingTimer: number | null = null;
 
     const unsubProfile = onSnapshot(
       userRef,
       (snap) => {
+        if (missingTimer) {
+          window.clearTimeout(missingTimer);
+          missingTimer = null;
+        }
         if (snap.exists()) {
           const data = snap.data() as Partial<UserProfile>;
           const rawRole = typeof data.role === 'string' ? data.role.trim().toLowerCase() : 'client';
           setProfile({
             uid: data.uid || authUser.uid,
+            clientCode: data.clientCode || '',
             name: data.name || authUser.displayName || authUser.email || 'User',
             email: data.email || authUser.email || '',
             phone: data.phone || '',
             companyName: data.companyName || 'Hasanah Tech Solutions',
+            avatarUrl: data.avatarUrl || '',
             role: rawRole === 'admin' ? 'admin' : 'client',
+            selfRegistered: Boolean(data.selfRegistered),
             createdAt: data.createdAt ?? null,
           });
           setProfileMissing(false);
+          setProfileLoading(false);
         } else {
-          setProfile(null);
-          setProfileMissing(true);
+          missingTimer = window.setTimeout(() => {
+            setProfile(null);
+            setProfileMissing(true);
+            setProfileLoading(false);
+          }, 2000);
         }
-        setProfileLoading(false);
       },
       (err) => {
+        if (missingTimer) {
+          window.clearTimeout(missingTimer);
+          missingTimer = null;
+        }
         setProfileLoading(false);
         setProfileMissing(true);
         try {
@@ -84,7 +99,10 @@ export function AuthPortalRouter() {
       }
     );
 
-    return () => unsubProfile();
+    return () => {
+      if (missingTimer) window.clearTimeout(missingTimer);
+      unsubProfile();
+    };
   }, [authReady, authUser]);
 
   const isVerifiedBootstrapAdmin =
@@ -232,9 +250,9 @@ export function AuthPortalRouter() {
   return (
     <>
       {profile.role === 'admin' ? (
-        <AdminDashboard userProfile={profile} />
+        <AdminDashboard key={profile.uid} userProfile={profile} />
       ) : (
-        <ClientPortal userProfile={profile} />
+        <ClientPortal key={profile.uid} userProfile={profile} />
       )}
 
       <BiometricEnrollSheet

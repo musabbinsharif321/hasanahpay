@@ -2,12 +2,10 @@
 
 import React from 'react';
 import {
-  Building2,
   CheckCircle2,
   Clock,
   AlertCircle,
   Loader2,
-  Smartphone,
   XCircle,
 } from 'lucide-react';
 import {
@@ -16,16 +14,16 @@ import {
   type PaymentStatus,
   type SubscriptionStatus,
 } from '@/lib/types';
+import { PaymentMethodLogo } from './PaymentLogos';
 
 export function PaymentMethodBadge({ method }: { method: PaymentMethodId }) {
   const meta = getPaymentMethodMeta(method);
-  const Icon = method === 'bank' ? Building2 : Smartphone;
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${meta.badgeBgClass} ${meta.badgeTextClass} whitespace-nowrap shrink-0`}
+      className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold ${meta.badgeBgClass} ${meta.badgeTextClass} whitespace-nowrap shrink-0`}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <PaymentMethodLogo method={method} className="h-4 w-4 shrink-0" />
       <span>{meta.name}</span>
     </span>
   );

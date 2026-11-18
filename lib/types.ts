@@ -12,11 +12,14 @@ export type PaymentStatus = 'pending' | 'approved' | 'rejected';
 
 export interface UserProfile {
   uid: string;
+  clientCode?: string;
   name: string;
   email: string;
   phone: string;
   companyName: string;
+  avatarUrl?: string;
   role: UserRole;
+  selfRegistered?: boolean;
   createdAt: Timestamp | null;
 }
 
