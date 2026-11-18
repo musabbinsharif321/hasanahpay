@@ -81,15 +81,15 @@ export function AppSplashIntro({ children }: { children: React.ReactNode }) {
                 animate={{ opacity: 1, scale: [0.45, 1.08, 1], rotateY: 0, rotateX: 0 }}
                 transition={{ duration: 0.95, ease: EASE_OUT_EXPO }}
                 style={{ transformStyle: 'preserve-3d', transform: 'translateZ(40px)' }}
-                className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border border-white/30 bg-white/95 p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_30px_rgba(56,189,248,0.3)]"
+                className="relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_30px_rgba(56,189,248,0.3)]"
               >
                 <Image
-                  src="/assets/aistudio/hasanah_logo_main_694d71ec.png"
+                  src="/hasanah logo with back.png"
                   alt="HasanahPay Logo"
-                  width={76}
-                  height={76}
+                  width={96}
+                  height={96}
                   priority
-                  className="h-full w-full object-contain"
+                  className="h-full w-full object-cover"
                 />
                 {/* Specular Light Sweep */}
                 <motion.span

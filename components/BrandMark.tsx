@@ -11,9 +11,9 @@ interface BrandMarkProps {
 }
 
 const SIZE_MAP = {
-  sm: { box: 'h-9 w-9 rounded-xl p-1', px: 36 },
-  md: { box: 'h-11 w-11 rounded-xl p-1.5', px: 44 },
-  lg: { box: 'h-14 w-14 rounded-2xl p-1.5', px: 56 },
+  sm: { box: 'h-9 w-9 rounded-full', px: 36 },
+  md: { box: 'h-11 w-11 rounded-full', px: 44 },
+  lg: { box: 'h-14 w-14 rounded-full', px: 56 },
 };
 
 export function BrandMark({ size = 'sm', variant = 'emblem', className = '' }: BrandMarkProps) {
@@ -21,7 +21,7 @@ export function BrandMark({ size = 'sm', variant = 'emblem', className = '' }: B
   const src =
     variant === 'seal'
       ? '/assets/aistudio/hasanah-logo_2c1c7ceb.png'
-      : '/assets/aistudio/hasanah_logo_main_694d71ec.png';
+      : '/hasanah logo with back.png';
 
   return (
     <div
@@ -33,7 +33,7 @@ export function BrandMark({ size = 'sm', variant = 'emblem', className = '' }: B
         width={dims.px}
         height={dims.px}
         referrerPolicy="no-referrer"
-        className="h-full w-full object-contain"
+        className="h-full w-full object-cover"
         priority
       />
     </div>
