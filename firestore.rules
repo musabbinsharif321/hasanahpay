@@ -1,0 +1,281 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrapAdmin() {
+      return isSignedIn() &&
+        request.auth.token.email == 'musabbinsharif321@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'phone', 'companyName', 'role', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'companyName', 'role', 'createdAt']) &&
+        data.uid == userId &&
+        isValidId(data.uid) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 150 &&
+        data.phone is string && data.phone.size() >= 6 && data.phone.size() <= 30 &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 120 &&
+        data.role in ['client', 'admin'] &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidSubscription(data, subId) {
+      return data.keys().hasAll(['id', 'clientId', 'clientName', 'serviceName', 'amount', 'billingCycle', 'nextDueDate', 'status']) &&
+        data.keys().hasOnly(['id', 'clientId', 'clientName', 'serviceName', 'amount', 'billingCycle', 'nextDueDate', 'status']) &&
+        data.id == subId &&
+        isValidId(data.id) &&
+        isValidId(data.clientId) &&
+        data.clientName is string && data.clientName.size() >= 1 && data.clientName.size() <= 120 &&
+        data.serviceName is string && data.serviceName.size() >= 2 && data.serviceName.size() <= 150 &&
+        (data.amount is int || data.amount is float) && data.amount > 0 && data.amount <= 10000000 &&
+        data.billingCycle in ['monthly', 'yearly'] &&
+        data.nextDueDate is timestamp &&
+        data.status in ['active', 'due', 'pending_verification'];
+    }
+
+    function isValidPayment(data, paymentId) {
+      return data.keys().hasAll(['id', 'clientId', 'clientName', 'subscriptionId', 'serviceName', 'method', 'senderNumber', 'trxId', 'amount', 'status', 'submittedAt']) &&
+        data.keys().hasOnly(['id', 'clientId', 'clientName', 'subscriptionId', 'serviceName', 'method', 'senderNumber', 'trxId', 'amount', 'status', 'submittedAt']) &&
+        data.id == paymentId &&
+        isValidId(data.id) &&
+        isValidId(data.clientId) &&
+        data.clientName is string && data.clientName.size() >= 1 && data.clientName.size() <= 120 &&
+        isValidId(data.subscriptionId) &&
+        data.serviceName is string && data.serviceName.size() >= 2 && data.serviceName.size() <= 150 &&
+        data.method in ['bkash', 'nagad', 'rocket', 'upay', 'bank'] &&
+        data.senderNumber is string && data.senderNumber.size() >= 4 && data.senderNumber.size() <= 50 &&
+        data.trxId is string && data.trxId.size() >= 4 && data.trxId.size() <= 64 && data.trxId.matches('^[A-Z0-9_\\-]+$') &&
+        (data.amount is int || data.amount is float) && data.amount > 0 && data.amount <= 10000000 &&
+        data.status in ['pending', 'approved', 'rejected'] &&
+        data.submittedAt is timestamp;
+    }
+
+    function isValidTrxLock(data, trxId) {
+      return data.keys().hasAll(['trxId', 'clientId', 'paymentId', 'createdAt']) &&
+        data.keys().hasOnly(['trxId', 'clientId', 'paymentId', 'createdAt']) &&
+        data.trxId == trxId &&
+        data.trxId is string && data.trxId.size() >= 4 && data.trxId.size() <= 64 && data.trxId.matches('^[A-Z0-9_\\-]+$') &&
+        isValidId(data.clientId) &&
+        isValidId(data.paymentId) &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidInvoice(data, invoiceId) {
+      return data.keys().hasAll(['id', 'invoiceNumber', 'paymentId', 'clientId', 'clientName', 'serviceName', 'method', 'trxId', 'amount', 'issuedAt']) &&
+        data.keys().hasOnly(['id', 'invoiceNumber', 'paymentId', 'clientId', 'clientName', 'serviceName', 'method', 'trxId', 'amount', 'issuedAt']) &&
+        data.id == invoiceId &&
+        isValidId(data.id) &&
+        data.invoiceNumber is string && data.invoiceNumber.size() >= 8 && data.invoiceNumber.size() <= 32 && data.invoiceNumber.matches('^INV-[0-9]{4}-[0-9]{3,}$') &&
+        isValidId(data.paymentId) &&
+        isValidId(data.clientId) &&
+        data.clientName is string && data.clientName.size() >= 1 && data.clientName.size() <= 120 &&
+        data.serviceName is string && data.serviceName.size() >= 2 && data.serviceName.size() <= 150 &&
+        data.method in ['bkash', 'nagad', 'rocket', 'upay', 'bank'] &&
+        data.trxId is string && data.trxId.size() >= 4 && data.trxId.size() <= 64 && data.trxId.matches('^[A-Z0-9_\\-]+$') &&
+        (data.amount is int || data.amount is float) && data.amount > 0 && data.amount <= 10000000 &&
+        data.issuedAt is timestamp;
+    }
+
+    function isValidBankAccount(bank) {
+      return bank is map &&
+        bank.keys().hasAll(['id', 'bankName', 'accountName', 'accountType', 'accountNumber', 'branch', 'routingNumber']) &&
+        bank.keys().hasOnly(['id', 'bankName', 'accountName', 'accountType', 'accountNumber', 'branch', 'routingNumber']) &&
+        bank.id is string && bank.id.size() >= 1 && bank.id.size() <= 64 && bank.id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        bank.bankName is string && bank.bankName.size() >= 2 && bank.bankName.size() <= 100 &&
+        bank.accountName is string && bank.accountName.size() >= 2 && bank.accountName.size() <= 120 &&
+        bank.accountType is string && bank.accountType.size() >= 2 && bank.accountType.size() <= 80 &&
+        bank.accountNumber is string && bank.accountNumber.size() >= 4 && bank.accountNumber.size() <= 60 &&
+        bank.branch is string && bank.branch.size() >= 2 && bank.branch.size() <= 120 &&
+        bank.routingNumber is string && bank.routingNumber.size() >= 2 && bank.routingNumber.size() <= 40;
+    }
+
+    function isValidPaymentAccountsSetting(data) {
+      return data.keys().hasAll([
+          'bkash', 'nagad', 'rocket', 'upay',
+          'bkashLabel', 'nagadLabel', 'rocketLabel', 'upayLabel',
+          'bkashEnabled', 'nagadEnabled', 'rocketEnabled', 'upayEnabled', 'bankEnabled',
+          'banks', 'supportPhone', 'supportEmail', 'website', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'bkash', 'nagad', 'rocket', 'upay',
+          'bkashLabel', 'nagadLabel', 'rocketLabel', 'upayLabel',
+          'bkashEnabled', 'nagadEnabled', 'rocketEnabled', 'upayEnabled', 'bankEnabled',
+          'banks', 'supportPhone', 'supportEmail', 'website', 'updatedAt'
+        ]) &&
+        data.bkash is string && data.bkash.size() >= 6 && data.bkash.size() <= 60 &&
+        data.nagad is string && data.nagad.size() >= 6 && data.nagad.size() <= 60 &&
+        data.rocket is string && data.rocket.size() >= 6 && data.rocket.size() <= 60 &&
+        data.upay is string && data.upay.size() >= 6 && data.upay.size() <= 60 &&
+        data.bkashLabel is string && data.bkashLabel.size() >= 2 && data.bkashLabel.size() <= 60 &&
+        data.nagadLabel is string && data.nagadLabel.size() >= 2 && data.nagadLabel.size() <= 60 &&
+        data.rocketLabel is string && data.rocketLabel.size() >= 2 && data.rocketLabel.size() <= 60 &&
+        data.upayLabel is string && data.upayLabel.size() >= 2 && data.upayLabel.size() <= 60 &&
+        data.bkashEnabled is bool &&
+        data.nagadEnabled is bool &&
+        data.rocketEnabled is bool &&
+        data.upayEnabled is bool &&
+        data.bankEnabled is bool &&
+        data.banks is list && data.banks.size() >= 1 && data.banks.size() <= 6 &&
+        (data.banks.size() < 1 || isValidBankAccount(data.banks[0])) &&
+        (data.banks.size() < 2 || isValidBankAccount(data.banks[1])) &&
+        (data.banks.size() < 3 || isValidBankAccount(data.banks[2])) &&
+        (data.banks.size() < 4 || isValidBankAccount(data.banks[3])) &&
+        (data.banks.size() < 5 || isValidBankAccount(data.banks[4])) &&
+        (data.banks.size() < 6 || isValidBankAccount(data.banks[5])) &&
+        data.supportPhone is string && data.supportPhone.size() >= 6 && data.supportPhone.size() <= 30 &&
+        data.supportEmail is string && data.supportEmail.size() >= 3 && data.supportEmail.size() <= 150 &&
+        data.website is string && data.website.size() >= 3 && data.website.size() <= 150 &&
+        data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Users (PII Protected)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(userId) &&
+        isValidUser(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        isAdmin();
+      allow update: if isValidId(userId) &&
+        isValidUser(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt && (
+          isAdmin() || (
+            isOwner(userId) &&
+            incoming().role == existing().role &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'companyName'])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 2. Subscriptions
+    match /subscriptions/{subscriptionId} {
+      allow get: if isValidId(subscriptionId) && isSignedIn() && (existing().clientId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
+      allow create: if isValidId(subscriptionId) &&
+        isAdmin() &&
+        isValidSubscription(incoming(), subscriptionId) &&
+        (
+          exists(/databases/$(database)/documents/users/$(incoming().clientId)) ||
+          existsAfter(/databases/$(database)/documents/users/$(incoming().clientId))
+        );
+      allow update: if isValidId(subscriptionId) &&
+        isSignedIn() &&
+        isValidSubscription(incoming(), subscriptionId) &&
+        incoming().id == existing().id &&
+        incoming().clientId == existing().clientId && (
+          isAdmin() || (
+            existing().clientId == request.auth.uid &&
+            existing().status in ['active', 'due'] &&
+            incoming().status == 'pending_verification' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+          )
+        );
+      allow delete: if isValidId(subscriptionId) && isAdmin();
+    }
+
+    // 3. Payments
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && isSignedIn() && (existing().clientId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
+      allow create: if isValidId(paymentId) &&
+        isSignedIn() &&
+        isValidPayment(incoming(), paymentId) &&
+        incoming().submittedAt == request.time && (
+          isAdmin() || (
+            incoming().clientId == request.auth.uid &&
+            incoming().status == 'pending' &&
+            exists(/databases/$(database)/documents/subscriptions/$(incoming().subscriptionId)) &&
+            get(/databases/$(database)/documents/subscriptions/$(incoming().subscriptionId)).data.clientId == request.auth.uid &&
+            existsAfter(/databases/$(database)/documents/trxIds/$(incoming().trxId))
+          )
+        );
+      allow update: if isValidId(paymentId) &&
+        isAdmin() &&
+        isValidPayment(incoming(), paymentId) &&
+        incoming().id == existing().id &&
+        incoming().clientId == existing().clientId &&
+        incoming().subscriptionId == existing().subscriptionId &&
+        incoming().submittedAt == existing().submittedAt &&
+        existing().status == 'pending' &&
+        incoming().status in ['approved', 'rejected'] &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isValidId(paymentId) && isAdmin();
+    }
+
+    // 4. Unique TrxID Lock Registry
+    match /trxIds/{trxId} {
+      allow get: if isValidId(trxId) && isSignedIn();
+      allow list: if isAdmin();
+      allow create: if isValidId(trxId) &&
+        isSignedIn() &&
+        isValidTrxLock(incoming(), trxId) &&
+        incoming().createdAt == request.time &&
+        (isAdmin() || incoming().clientId == request.auth.uid);
+      allow update: if false;
+      allow delete: if isValidId(trxId) && isAdmin();
+    }
+
+    // 5. Invoices (Immutable Financial Receipts)
+    match /invoices/{invoiceId} {
+      allow get: if isValidId(invoiceId) && isSignedIn() && (existing().clientId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.clientId == request.auth.uid || isAdmin());
+      allow create: if isValidId(invoiceId) &&
+        isAdmin() &&
+        isValidInvoice(incoming(), invoiceId) &&
+        incoming().issuedAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // 6. Agency Settings (Payment Receiving Accounts & Contact Info)
+    match /settings/{settingId} {
+      allow get: if settingId == 'paymentAccounts' && isSignedIn();
+      allow list: if false;
+      allow create, update: if settingId == 'paymentAccounts' &&
+        isAdmin() &&
+        isValidPaymentAccountsSetting(incoming()) &&
+        incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+  }
+}

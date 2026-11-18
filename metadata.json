@@ -1,0 +1,8 @@
+{
+  "name": "Hasanah Tech Solutions — Client Billing Portal",
+  "description": "Mobile-first Progressive Web App for Hasanah Tech Solutions client billing, subscriptions, local mobile banking payments (bKash, Nagad, Rocket, Upay, Bank), and instant digital invoices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,361 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile with role-based routing metadata for clients and admins.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Authentication user UID."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Full display name of the client or admin."
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 150,
+          "description": "Login email address."
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 30,
+          "description": "Contact phone number."
+        },
+        "companyName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Client organization or agency name."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["client", "admin"],
+          "description": "Access role determining Client Portal vs Admin Panel routing."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the user record was created."
+        }
+      },
+      "required": ["uid", "name", "email", "phone", "companyName", "role", "createdAt"]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Recurring service subscription assigned to a client.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clientId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clientName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "serviceName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "amount": {
+          "type": "number",
+          "description": "Subscription fee in BDT."
+        },
+        "billingCycle": {
+          "type": "string",
+          "enum": ["monthly", "yearly"]
+        },
+        "nextDueDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Firestore Timestamp for the next billing due date."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "due", "pending_verification"]
+        }
+      },
+      "required": ["id", "clientId", "clientName", "serviceName", "amount", "billingCycle", "nextDueDate", "status"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Client-submitted payment awaiting or resolved by admin verification.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clientId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clientName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "subscriptionId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "serviceName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "method": {
+          "type": "string",
+          "enum": ["bkash", "nagad", "rocket", "upay", "bank"]
+        },
+        "senderNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 50
+        },
+        "trxId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[A-Z0-9_\\-]+$"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"]
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "clientId", "clientName", "subscriptionId", "serviceName", "method", "senderNumber", "trxId", "amount", "status", "submittedAt"]
+    },
+    "TrxIdLock": {
+      "title": "TrxIdLock",
+      "description": "Uniqueness lock document keyed by uppercase Transaction ID to prevent duplicate submissions.",
+      "type": "object",
+      "properties": {
+        "trxId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[A-Z0-9_\\-]+$"
+        },
+        "clientId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "paymentId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["trxId", "clientId", "paymentId", "createdAt"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Paid digital invoice generated atomically upon payment approval.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "invoiceNumber": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 32,
+          "pattern": "^INV-[0-9]{4}-[0-9]{3,}$"
+        },
+        "paymentId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clientId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clientName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "serviceName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "method": {
+          "type": "string",
+          "enum": ["bkash", "nagad", "rocket", "upay", "bank"]
+        },
+        "trxId": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 64,
+          "pattern": "^[A-Z0-9_\\-]+$"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "invoiceNumber", "paymentId", "clientId", "clientName", "serviceName", "method", "trxId", "amount", "issuedAt"]
+    },
+    "BankAccountDetails": {
+      "title": "BankAccountDetails",
+      "description": "Corporate bank account entry configured by the agency admin.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "bankName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "accountName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "accountType": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "accountNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 60
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "routingNumber": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        }
+      },
+      "required": ["id", "bankName", "accountName", "accountType", "accountNumber", "branch", "routingNumber"]
+    },
+    "PaymentAccountsSetting": {
+      "title": "PaymentAccountsSetting",
+      "description": "Admin-managed agency receiving account numbers, labels, status toggles for MFS wallets, bounded bank list (1-6 banks), and support contact details.",
+      "type": "object",
+      "properties": {
+        "bkash": { "type": "string", "minLength": 6, "maxLength": 60 },
+        "nagad": { "type": "string", "minLength": 6, "maxLength": 60 },
+        "rocket": { "type": "string", "minLength": 6, "maxLength": 60 },
+        "upay": { "type": "string", "minLength": 6, "maxLength": 60 },
+        "bkashLabel": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "nagadLabel": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "rocketLabel": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "upayLabel": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "bkashEnabled": { "type": "boolean" },
+        "nagadEnabled": { "type": "boolean" },
+        "rocketEnabled": { "type": "boolean" },
+        "upayEnabled": { "type": "boolean" },
+        "bankEnabled": { "type": "boolean" },
+        "banks": {
+          "type": "array",
+          "description": "Bounded list of 1 to 6 BankAccountDetails entries."
+        },
+        "supportPhone": { "type": "string", "minLength": 6, "maxLength": 30 },
+        "supportEmail": { "type": "string", "minLength": 3, "maxLength": 150 },
+        "website": { "type": "string", "minLength": 3, "maxLength": 150 },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "bkash",
+        "nagad",
+        "rocket",
+        "upay",
+        "bkashLabel",
+        "nagadLabel",
+        "rocketLabel",
+        "upayLabel",
+        "bkashEnabled",
+        "nagadEnabled",
+        "rocketEnabled",
+        "upayEnabled",
+        "bankEnabled",
+        "banks",
+        "supportPhone",
+        "supportEmail",
+        "website",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile and role document keyed by Firebase Auth UID."
+    },
+    "/subscriptions/{subscriptionId}": {
+      "schema": { "$ref": "#/entities/Subscription" },
+      "description": "Client service subscriptions with billing cycle, amount, and live status."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Client payment verification requests with sender details and TrxID."
+    },
+    "/trxIds/{trxId}": {
+      "schema": { "$ref": "#/entities/TrxIdLock" },
+      "description": "Unique Transaction ID lock registry preventing duplicate TrxID submissions."
+    },
+    "/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "Approved digital invoices with sequential INV-YYYY-XXX identifiers."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/PaymentAccountsSetting" },
+      "description": "Global agency settings such as receiving payment accounts and company contact details."
+    }
+  }
+}
