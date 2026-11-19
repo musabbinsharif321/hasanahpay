@@ -574,7 +574,9 @@ export function LoginScreen({ onRequestBiometricSetup }: LoginScreenProps) {
         }
       }
 
+      console.error('Registration error:', err);
       const code = (err as { code?: string })?.code || '';
+      const message = err instanceof Error ? err.message : '';
       if (code === 'auth/email-already-in-use') {
         setRegStep('form');
         triggerError(
@@ -586,8 +588,20 @@ export function LoginScreen({ onRequestBiometricSetup }: LoginScreenProps) {
       } else if (code === 'auth/weak-password') {
         setRegStep('form');
         triggerError('Password is too weak. Use at least 6 characters.');
+      } else if (code === 'auth/operation-not-allowed') {
+        triggerError(
+          'Email/Password sign-in is disabled in Firebase Console -> Authentication -> Sign-in method.'
+        );
+      } else if (code === 'permission-denied' || message.includes('Missing or insufficient permissions')) {
+        triggerError(
+          'Firestore permission denied. Please publish the updated firestore.rules in Firebase Console.'
+        );
       } else {
-        triggerError('Could not complete registration. Please check your details and try again.');
+        triggerError(
+          code
+            ? `Registration failed (${code}). Please check your details and try again.`
+            : 'Could not complete registration. Please check your details and try again.'
+        );
       }
       showToast('Registration failed', 'error');
     } finally {
