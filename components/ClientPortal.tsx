@@ -11,6 +11,7 @@ import {
   Cloud,
   Copy,
   CreditCard,
+  Download,
   FileText,
   Fingerprint,
   Globe,
@@ -49,6 +50,7 @@ import {
   type UserProfile,
 } from '@/lib/types';
 import { AgencyContactStrip } from './BrandMark';
+import { downloadAgreementPdf } from '@/lib/agreementPdf';
 import { PWAInstallButton } from './PWAWidgets';
 import { useTheme } from './ThemeProvider';
 import {
@@ -193,6 +195,8 @@ export function ClientPortal({ userProfile }: { userProfile: UserProfile }) {
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
+  const [detailSub, setDetailSub] = useState<Subscription | null>(null);
+  const [downloadingAgreement, setDownloadingAgreement] = useState(false);
   const [activeInvoice, setActiveInvoice] = useState<Invoice | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [biometricSupported, setBiometricSupported] = useState(false);
@@ -781,7 +785,16 @@ Support & Contact:
                         return (
                           <article
                             key={sub.id}
-                            className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-[#0B162B]"
+                            onClick={() => setDetailSub(sub)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setDetailSub(sub);
+                              }
+                            }}
+                            className="flex cursor-pointer flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition hover:border-[#1D6E8C]/40 active:scale-[0.99] dark:border-slate-800 dark:bg-[#0B162B] dark:hover:border-[#38BDF8]/40"
                           >
                             <div>
                               <div className="flex items-start justify-between gap-3">
@@ -799,11 +812,15 @@ Support & Contact:
                                 <span>Next due {formatTimestampDate(sub.nextDueDate)}</span>
                               </div>
 
-                              <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                              <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
                                 <SubscriptionStatusIndicator
                                   status={sub.status}
                                   dueSoon={dueSoonFlag}
                                 />
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#1D6E8C] dark:text-[#38BDF8]">
+                                  <span>Details &amp; Agreement</span>
+                                  <ChevronRight className="h-3.5 w-3.5" />
+                                </span>
                               </div>
                             </div>
 
@@ -1668,6 +1685,131 @@ Support & Contact:
           </button>
         </div>
       </nav>
+
+      {/* Subscription Details & Agreement Modal */}
+      {detailSub && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Service details and agreement"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[#0B2447]/60 backdrop-blur-xs sm:items-center sm:p-4"
+        >
+          <div className="absolute inset-0" onClick={() => setDetailSub(null)} />
+          <div className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl dark:border dark:border-slate-800 dark:bg-[#0B162B] sm:rounded-3xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3.5 dark:border-slate-800">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-[#0B2447] dark:text-white">
+                  {detailSub.serviceName}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {formatBDT(detailSub.amount)} ·{' '}
+                  <span className="capitalize">{detailSub.billingCycle}</span> · Due{' '}
+                  {formatTimestampDate(detailSub.nextDueDate)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailSub(null)}
+                aria-label="Close"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3.5 py-2.5 dark:bg-slate-900/70">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  Current Status
+                </span>
+                <SubscriptionStatusIndicator
+                  status={detailSub.status}
+                  dueSoon={isDueSoon(detailSub.nextDueDate)}
+                />
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#1D6E8C] dark:text-[#38BDF8]">
+                  Service Details &amp; Deliverables
+                </h3>
+                <div className="mt-1.5 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 text-xs leading-relaxed whitespace-pre-wrap text-slate-700 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-200">
+                  {detailSub.details?.trim()
+                    ? detailSub.details
+                    : 'Your service is managed by Hasanah Tech Solutions. Contact support if you need specific technical credentials or scope updates.'}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#1D6E8C] dark:text-[#38BDF8]">
+                  Service Agreement &amp; Terms
+                </h3>
+                <div className="mt-1.5 max-h-48 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 text-xs leading-relaxed whitespace-pre-wrap text-slate-700 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-200">
+                  {detailSub.agreementText?.trim()
+                    ? detailSub.agreementText
+                    : `1. Service Scope: Hasanah Tech Solutions will deliver and maintain "${detailSub.serviceName}" as agreed.\n2. Billing & Renewal: Fees (${formatBDT(detailSub.amount)} / ${detailSub.billingCycle}) must be cleared before the due date.\n3. Verification: Payments are verified via TrxID and an official digital invoice is issued upon approval.\n4. Support: Technical support is available via ${paymentAccounts.supportPhone} or ${paymentAccounts.supportEmail}.`}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-2.5 pb-safe">
+              <button
+                type="button"
+                disabled={downloadingAgreement}
+                onClick={async () => {
+                  if (!detailSub || downloadingAgreement) return;
+                  setDownloadingAgreement(true);
+                  try {
+                    await downloadAgreementPdf(detailSub, userProfile, paymentAccounts);
+                    showToast('Agreement PDF downloaded!', 'success');
+                  } catch (err) {
+                    console.error(err);
+                    showToast('Could not generate Agreement PDF.', 'error');
+                  } finally {
+                    setDownloadingAgreement(false);
+                  }
+                }}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#1D6E8C]/35 bg-[#1D6E8C]/10 text-xs font-semibold text-[#0B2447] transition hover:bg-[#1D6E8C]/20 disabled:opacity-60 dark:border-[#38BDF8]/35 dark:bg-[#1D6E8C]/20 dark:text-[#38BDF8]"
+              >
+                {downloadingAgreement ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Generating Agreement PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    <span>Download Agreement PDF</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDetailSub(null)}
+                  className="h-11 flex-1 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                  Close
+                </button>
+                {detailSub.status !== 'pending_verification' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const subToPay = detailSub;
+                      setDetailSub(null);
+                      openCheckoutFor(subToPay);
+                    }}
+                    className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#0B2447] text-xs font-semibold text-white transition hover:bg-[#13386B] dark:bg-[#1D6E8C] dark:hover:bg-[#2583A6]"
+                  >
+                    <CreditCard className="h-4 w-4 text-[#E5A93B] dark:text-white" />
+                    <span>Pay Now</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Gateway Checkout Bottom-Sheet */}
       <GatewayCheckoutSheet

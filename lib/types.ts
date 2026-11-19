@@ -32,6 +32,8 @@ export interface Subscription {
   billingCycle: BillingCycle;
   nextDueDate: Timestamp;
   status: SubscriptionStatus;
+  details?: string;
+  agreementText?: string;
 }
 
 export interface Payment {

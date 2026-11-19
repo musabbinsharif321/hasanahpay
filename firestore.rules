@@ -65,7 +65,7 @@ service cloud.firestore {
 
     function isValidSubscription(data, subId) {
       return data.keys().hasAll(['id', 'clientId', 'clientName', 'serviceName', 'amount', 'billingCycle', 'nextDueDate', 'status']) &&
-        data.keys().hasOnly(['id', 'clientId', 'clientName', 'serviceName', 'amount', 'billingCycle', 'nextDueDate', 'status']) &&
+        data.keys().hasOnly(['id', 'clientId', 'clientName', 'serviceName', 'amount', 'billingCycle', 'nextDueDate', 'status', 'details', 'agreementText']) &&
         data.id == subId &&
         isValidId(data.id) &&
         isValidId(data.clientId) &&
@@ -74,7 +74,9 @@ service cloud.firestore {
         (data.amount is int || data.amount is float) && data.amount > 0 && data.amount <= 10000000 &&
         data.billingCycle in ['monthly', 'yearly'] &&
         data.nextDueDate is timestamp &&
-        data.status in ['active', 'due', 'pending_verification'];
+        data.status in ['active', 'due', 'pending_verification'] &&
+        (!('details' in data) || (data.details is string && data.details.size() <= 4000)) &&
+        (!('agreementText' in data) || (data.agreementText is string && data.agreementText.size() <= 8000));
     }
 
     function isValidPayment(data, paymentId) {

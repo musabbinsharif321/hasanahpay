@@ -105,12 +105,25 @@ export function AdminDashboard({ userProfile }: { userProfile: UserProfile }) {
   const [clientEmail, setClientEmail] = useState('');
   const [clientPassword, setClientPassword] = useState('');
 
+const DEFAULT_AGREEMENT_TEMPLATE = `1. Service Scope: Hasanah Tech Solutions will deliver and maintain the assigned service as specified in the Service Details.
+2. Billing & Renewal: Subscription fees are billed per the agreed cycle (monthly/yearly) and must be settled before the due date to avoid service interruption.
+3. Verification: All MFS/Bank payments are verified against the submitted TrxID and official digital invoice is issued upon approval.
+4. Support & SLA: Priority technical support is available via official phone and email channels during business hours.`;
+
   // Service fields (shared by both modes)
   const [selectedExistingClientId, setSelectedExistingClientId] = useState('');
   const [serviceName, setServiceName] = useState('');
   const [serviceAmount, setServiceAmount] = useState('');
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [initialStatus, setInitialStatus] = useState<'active' | 'due'>('due');
+  const [serviceDetails, setServiceDetails] = useState('');
+  const [serviceAgreement, setServiceAgreement] = useState('');
+
+  // Edit existing subscription details & agreement modal state
+  const [editingSub, setEditingSub] = useState<Subscription | null>(null);
+  const [editSubDetails, setEditSubDetails] = useState('');
+  const [editSubAgreement, setEditSubAgreement] = useState('');
+  const [savingSubDetails, setSavingSubDetails] = useState(false);
 
   // Settings & Seeder state
   const [savingSettings, setSavingSettings] = useState(false);
@@ -651,6 +664,8 @@ Agency Support Contact:
         billingCycle,
         nextDueDate: Timestamp.fromDate(dueDate),
         status: initialStatus,
+        ...(serviceDetails.trim() ? { details: serviceDetails.trim() } : {}),
+        ...(serviceAgreement.trim() ? { agreementText: serviceAgreement.trim() } : {}),
       });
 
       await batch.commit();
@@ -680,6 +695,8 @@ Agency Support Contact:
       setClientPassword('');
       setServiceName('');
       setServiceAmount('');
+      setServiceDetails('');
+      setServiceAgreement('');
       setAddSheetOpen(false);
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code || '';
@@ -693,6 +710,31 @@ Agency Support Contact:
       }
     } finally {
       setSubmittingClient(false);
+    }
+  };
+
+  const handleOpenEditSub = (sub: Subscription) => {
+    setEditingSub(sub);
+    setEditSubDetails(sub.details || '');
+    setEditSubAgreement(sub.agreementText || '');
+  };
+
+  const handleSaveSubDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSub || savingSubDetails) return;
+    setSavingSubDetails(true);
+    try {
+      await updateDoc(doc(db, 'subscriptions', editingSub.id), {
+        details: editSubDetails.trim(),
+        agreementText: editSubAgreement.trim(),
+      });
+      showToast('Service details & agreement updated!', 'success');
+      setEditingSub(null);
+    } catch (err) {
+      console.error(err);
+      showToast('Could not update service details.', 'error');
+    } finally {
+      setSavingSubDetails(false);
     }
   };
 
@@ -1287,15 +1329,24 @@ Agency Support Contact:
                                       {formatTimestampDate(sub.nextDueDate)}
                                     </p>
                                   </div>
-                                  <button
-                                    type="button"
-                                    disabled={sub.status === 'pending_verification'}
-                                    onClick={() => handleToggleSubStatus(sub)}
-                                    title="Tap to toggle Active / Due status"
-                                    className="min-h-[36px] shrink-0 rounded-lg px-2 py-1 transition hover:bg-white dark:hover:bg-slate-800"
-                                  >
-                                    <SubscriptionStatusIndicator status={sub.status} />
-                                  </button>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditSub(sub)}
+                                      className="min-h-[32px] rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-[#1D6E8C] transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-[#38BDF8]"
+                                    >
+                                      Details
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={sub.status === 'pending_verification'}
+                                      onClick={() => handleToggleSubStatus(sub)}
+                                      title="Tap to toggle Active / Due status"
+                                      className="min-h-[36px] shrink-0 rounded-lg px-2 py-1 transition hover:bg-white dark:hover:bg-slate-800"
+                                    >
+                                      <SubscriptionStatusIndicator status={sub.status} />
+                                    </button>
+                                  </div>
                                 </div>
                               ))
                             )}
@@ -1977,6 +2028,41 @@ Agency Support Contact:
                         <option value="active">Active (Next cycle upcoming)</option>
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Service Details &amp; Deliverables
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={serviceDetails}
+                        onChange={(e) => setServiceDetails(e.target.value)}
+                        placeholder="e.g. Domain, Hosting specs, Pages/Features included, Support scope..."
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 focus:border-[#1D6E8C] focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-900/70 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          Service Agreement &amp; Terms
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setServiceAgreement(DEFAULT_AGREEMENT_TEMPLATE)}
+                          className="text-[11px] font-semibold text-[#1D6E8C] hover:underline dark:text-[#38BDF8]"
+                        >
+                          Load Standard Agreement
+                        </button>
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={serviceAgreement}
+                        onChange={(e) => setServiceAgreement(e.target.value)}
+                        placeholder="Enter service agreement, renewal terms, SLA..."
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 focus:border-[#1D6E8C] focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-900/70 dark:text-white"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1996,6 +2082,97 @@ Agency Support Contact:
                     )}
                   </button>
                 </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Subscription Details & Agreement Modal */}
+      <AnimatePresence>
+        {editingSub && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit service details and agreement"
+            className="fixed inset-0 z-50 flex items-end justify-center bg-[#0B2447]/60 backdrop-blur-xs sm:items-center sm:p-4"
+          >
+            <div className="absolute inset-0" onClick={() => setEditingSub(null)} />
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 30, opacity: 0 }}
+              className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl dark:border dark:border-slate-800 dark:bg-[#0B162B] sm:rounded-3xl"
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3.5 dark:border-slate-800">
+                <div>
+                  <h2 className="text-base font-bold text-[#0B2447] dark:text-white">
+                    {editingSub.serviceName}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Client: {editingSub.clientName} · {formatBDT(editingSub.amount)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingSub(null)}
+                  aria-label="Close"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveSubDetails} className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    Service Details &amp; Deliverables
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={editSubDetails}
+                    onChange={(e) => setEditSubDetails(e.target.value)}
+                    placeholder="Domain, server specs, deliverables, login notes..."
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 focus:border-[#1D6E8C] focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-900/70 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Service Agreement &amp; Terms
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setEditSubAgreement(DEFAULT_AGREEMENT_TEMPLATE)}
+                      className="text-[11px] font-semibold text-[#1D6E8C] hover:underline dark:text-[#38BDF8]"
+                    >
+                      Load Standard Agreement
+                    </button>
+                  </div>
+                  <textarea
+                    rows={5}
+                    value={editSubAgreement}
+                    onChange={(e) => setEditSubAgreement(e.target.value)}
+                    placeholder="Agreement, SLA, renewal terms..."
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 focus:border-[#1D6E8C] focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-900/70 dark:text-white"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingSubDetails}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0B2447] text-sm font-semibold text-white transition hover:bg-[#13386B] disabled:opacity-60 dark:bg-[#1D6E8C] dark:hover:bg-[#2583A6]"
+                >
+                  {savingSubDetails ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Details &amp; Agreement</span>
+                  )}
+                </button>
               </form>
             </motion.div>
           </div>
